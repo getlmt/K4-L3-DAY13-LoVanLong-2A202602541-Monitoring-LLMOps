@@ -123,6 +123,14 @@ Dashboard dùng `data/logs.jsonl` làm nguồn chuẩn và giữ đúng 6 panel 
 - `config/alert_rules.yaml`: ba alert symptom-based, có duration, severity, owner, Slack channel và runbook;
 - `docs/alerts.md`: cách kiểm tra và mitigation cho từng alert.
 
+Dashboard của bài làm này là ứng dụng Streamlit trong thư mục `dashboard/`. Sau khi có `data/logs.jsonl` (chạy API và `python scripts/load_test.py --concurrency 5`), chạy:
+
+```bash
+streamlit run dashboard/app.py
+```
+
+Rồi mở http://localhost:8501. Dashboard đọc `data/logs.jsonl` và `config/dashboard.yaml`, hiển thị 60 phút gần nhất và tự refresh mỗi 30 giây.
+
 ### CP3 — Challenge chính thức
 
 Chỉ chạy khi Lab Coach thông báo mở challenge của K4-L3A. Tại CP3, Lab Coach gửi riêng file đúng lớp; lưu file đó tại `config/challenge.json`. File này đã được `.gitignore` và **không được** force-add/commit/push:

@@ -47,6 +47,7 @@ def render() -> None:
             st.info("Chưa có dữ liệu trong 60 phút gần nhất.")
             return
         long = df.reset_index().melt("ts", var_name="series", value_name="value").dropna()
+        long["ts"] = long["ts"].dt.tz_convert("UTC").dt.tz_localize(None)  # hiển thị đúng giờ UTC, không đổi theo múi giờ trình duyệt
         base = alt.Chart(long).mark_line(point=True).encode(
             x=alt.X("ts:T", title="time (UTC)"),
             y=alt.Y("value:Q", title=unit),

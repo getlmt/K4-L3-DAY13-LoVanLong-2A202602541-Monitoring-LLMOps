@@ -9,7 +9,7 @@
 - **Lớp:** K4-L3A
 - **Repository URL:** https://github.com/getlmt/K4-L3-DAY13-LoVanLong-2A202602541-Monitoring-LLMOps
 - **Commit SHA cuối:**
-- **Challenge ID:**
+- **Challenge ID:** `day13-k4-l3a-monitoring-llmops-v1`
 - **Tên project Langfuse cá nhân:** `day13-k4-l3a-2A202602541`
 
 ## 2. Evidence index
@@ -18,9 +18,9 @@
 
 | Evidence | Đường dẫn |
 |---|---|
-| Pytest cuối | `evidence/01-pytest.png` |
-| Log validator | `evidence/02-log-validator.png` |
-| Dashboard validator | `evidence/03-dashboard-validator.png` |
+| Pytest cuối | `evidence/01-pytest.txt` (commit cuối); `evidence/01-pytest.png` (sau CP1) |
+| Log validator | `evidence/02-log-validator.txt` (commit cuối); `evidence/02-log-validator.png` (sau CP1) |
+| Dashboard validator | `evidence/03-dashboard-validator.txt` (commit cuối); `evidence/03-dashboard-validator.png` (sau CP1) |
 | Structured log | `evidence/04-structured-log.png` |
 | PII redaction | `evidence/05-pii-redaction.png` |
 | Trace list | `evidence/06-trace-list.png` |
@@ -37,11 +37,11 @@
 
 | Nội dung | Baseline | Kết quả cuối | Nhận xét |
 |---|---|---|---|
-| `validate_logs.py` | 30/100 | 100/100 (sau CP1) | Có 10 correlation ID, 0 record thiếu field, đủ enrichment |
-| `validate_dashboard.py` | 6/6 panel hợp lệ | 6/6 panel hợp lệ (sau CP1) | Chỉ kiểm tra cấu trúc YAML, chưa phải dashboard runtime |
-| `pytest` | 22 passed | 24 passed (sau CP1) | Thêm 2 test PII: CCCD/thẻ và passport |
-| Số traces hợp lệ | 10 (chỉ root, chưa có child) | ≥ 24 traces có root + retrieval + generation | Mỗi trace có correlation_id, user hash, session, feature, model, env |
-| Số PII leak | 0 | 0 (sau CP1) | Validator không phát hiện PII nguyên văn |
+| `validate_logs.py` | 30/100 | 100/100 (commit cuối, 193 record, 97 correlation ID) | Có 10 correlation ID, 0 record thiếu field, đủ enrichment |
+| `validate_dashboard.py` | 6/6 panel hợp lệ | 6/6 panel hợp lệ (commit cuối) | Chỉ kiểm tra cấu trúc YAML, chưa phải dashboard runtime |
+| `pytest` | 22 passed | 27 passed (commit cuối) | Thêm 2 test PII (CCCD/thẻ, passport) và 3 test tính toán dashboard; mở rộng test generation |
+| Số traces hợp lệ | 10 (chỉ root, chưa có child) | hơn 100 traces có root + retrieval + generation trong project cá nhân | Mỗi trace có correlation_id, user hash, session, feature, model, env |
+| Số PII leak | 0 | 0 (commit cuối) | Validator không phát hiện PII nguyên văn |
 | Latency P95 / TTFT P95 | | 153 ms / 50 ms (baseline warm, dashboard) | Cold start 1.1-2.1 s chỉ ảnh hưởng vài request đầu sau restart |
 | Retrieval success rate | | 100% | Chưa bật incident tool_fail |
 
@@ -76,24 +76,24 @@
 
 ## 7. Điều tra challenge
 
-- **Challenge ID:**
-- **Khoảng thời gian điều tra:**
-- **Triệu chứng từ metrics:**
-- **Log line và correlation ID liên quan:**
-- **Trace ID và span gây ảnh hưởng:**
-- **Root cause:**
-- **Fix action:**
-- **Preventive measure:**
+- **Challenge ID:** `day13-k4-l3a-monitoring-llmops-v1`
+- **Khoảng thời gian điều tra:** 2026-09-29 09:58:00 đến 09:58:14 UTC (16:58 giờ Việt Nam), chạy `inject_incident.py` rồi `load_test.py --challenge --concurrency 5` với 5 request feature `monitoring`.
+- **Triệu chứng từ metrics:** Panel Latency: P95 tăng từ 153 ms (baseline) lên 2653 ms (gấp khoảng 17 lần), P50 và P99 cũng lên 2653 ms. Các panel khác gần như không đổi: TTFT P95 vẫn 50 ms, error rate 0%, retrieval success 100%, cost mỗi request bình thường (khoảng $0.002), quality 0.84. Vậy request vẫn thành công (HTTP 200) nhưng chậm, và phần chậm không nằm ở LLM. Evidence: `evidence/12-incident-metric.png`.
+- **Log line và correlation ID liên quan:** Lọc `event == "response_sent"` trong khoảng trên, request `req-ba3ba3c2` có `latency_ms: 2653`, `ttft_ms: 50`, `feature: "monitoring"`, `tokens_out: 93`, `cost_usd: 0.001497`. Cả 5 request trong đợt chạy đều có latency 2652-2653 ms. Log không có `request_failed` nào. Evidence: `evidence/13-incident-log.png`.
+- **Trace ID và span gây ảnh hưởng:** Trace `3dc9c85131acc08a49f8e896b6a975e7` (metadata `correlation_id = req-ba3ba3c2`). Span tree: `lab-agent-run` 2.656 s gồm `retrieval` (retriever) 2.504 s và `llm-generation` 0.152 s. Span `retrieval` chiếm khoảng 94% thời gian request; `llm-generation` giống hệt mức baseline (0.15 s). Evidence: `evidence/14-incident-trace.png`.
+- **Root cause:** Bước retrieval (vector store/RAG) chậm thêm khoảng 2.5 s mỗi request (sự cố `rag_slow`). Ba bằng chứng cùng chỉ về nguyên nhân này: metric (P95 latency 153 → 2653 ms nhưng TTFT, error và cost không đổi), log (`req-ba3ba3c2` latency 2653 ms, không có lỗi) và trace (span `retrieval` 2.504 s, `llm-generation` 0.152 s).
+- **Fix action:** Tắt incident bằng `python scripts/inject_incident.py --disable` (giả lập khôi phục retrieval). Chạy lại load test: các request mới chỉ mất khoảng 0.3-0.8 s, P95 về mức bình thường.
+- **Preventive measure:** Đặt timeout và fallback cho bước retrieval (quá thời gian thì trả câu trả lời không dùng retrieval); bật alert `high_latency_p95` (P95 > 1500 ms trong 5 phút, SLO `fast_successful_requests`) để phát hiện sớm, vì ngưỡng 3000 ms của dashboard sẽ bỏ sót sự cố này (2653 ms); thêm metric riêng cho thời gian retrieval để thấy ngay bước chậm mà không cần mở trace.
 
 ## 8. Giải thích và tự đánh giá
 
-- **Một quyết định kỹ thuật quan trọng và lý do:**
-- **Một lỗi/blocker đã gặp:**
-- **Cách tìm nguyên nhân và xử lý:**
-- **Cách hiểu luồng Metrics → Logs → Traces:**
-- **Vai trò của prompt version, token/cost, SLO hoặc rollback trong vận hành LLM:**
-- **Điều quan trọng nhất đã học:**
-- **Hạn chế hoặc phần chưa hoàn thành, nếu có:**
+- **Một quyết định kỹ thuật quan trọng và lý do:** Hạ ngưỡng latency của SLO từ 3000 ms xuống 1500 ms (`config/slo.yaml`) thay vì giữ giá trị mặc định. Baseline warm của tôi có P95 khoảng 153 ms, cold start 1.1-2.1 s; sự cố `rag_slow` chỉ làm request mất khoảng 2.7 s, dưới 3000 ms nên với ngưỡng mặc định sẽ không bị tính là request xấu và alert không kích hoạt. Ngưỡng 1500 ms vẫn đủ rộng để bỏ qua cold start đơn lẻ nhưng bắt được sự cố. Ngưỡng 3000 ms trong `dashboard.yaml` giữ nguyên vì đó là contract.
+- **Một lỗi/blocker đã gặp:** Sau khi rollback `production` về v1 trên Langfuse, request gửi ngay sau đó (`req-prod-v1`, trace `a2beb12ddb5de8d087b8db64adc26243`) vẫn dùng prompt v2. Trước đó cũng gặp `ModuleNotFoundError: No module named 'httpx'` khi chạy load test vì terminal thứ hai chưa activate `.venv`.
+- **Cách tìm nguyên nhân và xử lý:** Với lỗi rollback: đọc metadata trace thấy `prompt_version` vẫn là 2 dù label `production` đã trỏ v1; xem `app/prompt_management.py` thấy `cache_ttl_seconds=60`, tức app cache prompt 60 giây. Sau khi restart app (cache sạch) request `req-rollback-v1` dùng đúng v1. Bài học: rollback prompt không tức thời, cần tính độ trễ cache hoặc restart/invalidate. Với lỗi httpx: activate `.venv` ở terminal thứ hai rồi `pip install -r requirements.txt`.
+- **Cách hiểu luồng Metrics → Logs → Traces:** Metrics cho biết có vấn đề ở đâu và từ lúc nào nhưng không nói request nào; trong challenge, panel Latency cho thấy P95 nhảy từ 153 lên 2653 ms trong khi TTFT, error và cost không đổi, nên tôi biết request chậm nhưng không hỏng và không phải LLM. Logs cho phép lọc các event trong khoảng đó và chọn một request cụ thể bằng `correlation_id` (`req-ba3ba3c2`). Traces mở đúng request đó theo `correlation_id` và cho thấy span nào chiếm thời gian (`retrieval` 2.504 s trong tổng 2.656 s). `correlation_id` là khóa nối ba tầng, và middleware phải sinh và truyền nó ngay từ đầu request để cả log lẫn trace đều mang cùng ID.
+- **Vai trò của prompt version, token/cost, SLO hoặc rollback trong vận hành LLM:** Prompt là một thành phần thay đổi hành vi như code nên cần version và label để biết mỗi request đã dùng bản nào (trace ghi `prompt_name/label/version`) và có thể rollback khi chất lượng hoặc chi phí xấu đi. Token và cost là tín hiệu vận hành đặc thù của LLM: một prompt dài hơn hoặc output dài hơn làm cost mỗi request tăng dù không có lỗi, nên có alert `cost_per_request_spike`. SLO và error budget biến "chậm" thành mục tiêu đo được (99.5% request dưới 1500 ms) và cho biết khi nào cần dừng tính năng mới để ổn định hệ thống.
+- **Điều quan trọng nhất đã học:** Instrument đúng ngay từ đầu (correlation ID, log có cấu trúc, span con) khiến điều tra sự cố chỉ mất vài bước; ngưỡng SLO phải dựa trên baseline đo được của chính hệ thống chứ không lấy mặc định.
+- **Hạn chế hoặc phần chưa hoàn thành, nếu có:** Dashboard đọc file `data/logs.jsonl` nên chỉ phù hợp một instance và không có lưu trữ dài hạn; alert mới ở dạng cấu hình YAML và runbook, chưa nối thật tới Slack; LLM và retrieval là bản giả lập nên latency baseline thấp; rollback prompt bị trễ tối đa 60 giây do cache.
 
 ## 9. Checklist trước khi nộp
 
