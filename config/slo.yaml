@@ -3,11 +3,21 @@ primary_slo:
   name: fast_successful_requests
   window: 28d
   sli:
-    good_event: 'event == "response_sent" and latency_ms <= 3000'
+    # Request "tốt" = có trả lời và P95 ổn định dưới ngưỡng latency đã chọn từ baseline.
+    good_event: 'event == "response_sent" and latency_ms <= 1500'
     total_event: 'event == "request_received"'
   target_percent: 99.5
   error_budget_percent: 0.5
-  note: Học viên phải giải thích hoặc điều chỉnh ngưỡng bằng baseline của mình.
+  note: >
+    Baseline của tôi (fake LLM + retrieval local, đo bằng dashboard sau khi bật tracing và prompt cache):
+    P50 ~152 ms, P95 ~153 ms khi app đã warm; các request đầu tiên sau khi restart (cold start, lấy prompt
+    từ Langfuse) chậm 1.1-2.1 s. Ngưỡng 1500 ms cao hơn nhiều so với P95 baseline nên không báo động giả vì
+    cold start đơn lẻ, nhưng vẫn bắt được sự cố rag_slow (retrieval +2.5 s, khoảng 2.7 s/request), mà
+    ngưỡng 3000 ms của dashboard sẽ bỏ sót. Ngưỡng 3000 ms trong dashboard là guardrail toàn hệ thống;
+    SLO chặt hơn để phát hiện sớm.
+    Error budget = 100% - 99.5% = 0.5% số request trong 28 ngày (ví dụ 100,000 request thì được phép
+    tối đa 500 request chậm hoặc lỗi). Burn rate 1x nghĩa là tiêu hết budget đúng vào ngày thứ 28;
+    burn rate > 14x kéo dài 1 giờ thì tiêu hết budget trong khoảng 2 ngày và cần xử lý ngay.
 guardrails:
   error_rate_pct_max: 2
   daily_cost_usd_max: 2.5
