@@ -8,7 +8,7 @@
 - **MSSV:** 2A202602541
 - **Lớp:** K4-L3A
 - **Repository URL:** https://github.com/getlmt/K4-L3-DAY13-LoVanLong-2A202602541-Monitoring-LLMOps
-- **Commit SHA cuối:** c849ae31ad6785d497bec048096c06fd9f0569cb (commit chứa toàn bộ source, config, evidence; commit sau đó chỉ ghi SHA vào report)
+- **Commit SHA cuối:** c849ae31ad6785d497bec048096c06fd9f0569cb
 - **Challenge ID:** `day13-k4-l3a-monitoring-llmops-v1`
 - **Tên project Langfuse cá nhân:** `day13-k4-l3a-2A202602541`
 
